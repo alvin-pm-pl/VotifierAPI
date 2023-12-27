@@ -16,8 +16,10 @@ declare(strict_types=1);
 
 namespace alvin0319\VotifierAPI\thread;
 
-use pocketmine\snooze\SleeperNotifier;
+use pocketmine\snooze\SleeperHandlerEntry;
 use pocketmine\thread\Thread;
+use pmmp\thread\ThreadSafe;
+use pmmp\thread\ThreadSafeArray;
 use function fread;
 use function fsockopen;
 use function fwrite;
@@ -46,9 +48,9 @@ final class VoteThread extends Thread{
 		private string $hostAddress,
 		private int $hostPort,
 		private string $password,
-		private SleeperNotifier $notifier,
-		private \Volatile $in,
-		private \Volatile $out
+		private SleeperHandlerEntry $notifier,
+		private ThreadSafeArray $in,
+		private ThreadSafeArray $out
 	){
 	}
 
@@ -86,7 +88,7 @@ final class VoteThread extends Thread{
 			}
 			if(trim($res) !== ""){
 				$this->out[] = igbinary_serialize($res);
-				$this->notifier->wakeupSleeper();
+				$this->notifier->createNotifier()->wakeupSleeper();
 			}
 			while(($data = $this->in->shift()) !== null){
 				$opCode = json_encode([

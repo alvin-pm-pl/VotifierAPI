@@ -19,62 +19,62 @@ namespace alvin0319\VotifierAPI;
 use alvin0319\VotifierAPI\event\PlayerVoteEvent;
 use alvin0319\VotifierAPI\thread\VoteThread;
 use pocketmine\plugin\PluginBase;
-use pocketmine\snooze\SleeperNotifier;
+use pmmp\thread\ThreadSafe;
+use pmmp\thread\ThreadSafeArray;
 use function igbinary_unserialize;
 use function json_decode;
 
 final class Loader extends PluginBase{
 
-	private VoteThread $thread;
+    private VoteThread $thread;
 
-	private SleeperNotifier $notifier;
+    private int $notifierId = -1;
 
-	protected function onEnable() : void{
-		$this->saveDefaultConfig();
+    protected function onEnable() : void{
+        $this->saveDefaultConfig();
 
-		$in = new \Volatile();
-		$out = new \Volatile();
+        $in = new ThreadSafeArray();
+        $out = new ThreadSafeArray();
 
-		$this->notifier = new SleeperNotifier();
+        $sleeperHandlerEntry = $this->getServer()->getTickSleeper()->addNotifier(function() use ($out) : void{
+            if(($data = $out->shift()) !== null){
+                $opData = json_decode(igbinary_unserialize($data), true);
+                if($opData["op"] === VoteThread::LOGIN_SUCCESS){
+                    $this->thread->setAuthenticated(true);
+                    $this->getLogger()->info("Authenticated to Votifier server");
+                }elseif($opData["op"] === VoteThread::LOGIN_FAILURE){
+                    $this->getLogger()->error("Failed to authenticate to Votifier server");
+                    $this->getServer()->getPluginManager()->disablePlugin($this);
+                }elseif($opData["op"] === VoteThread::MESSAGE){
+                    $message = json_decode($opData["payload"], true);
+                    $serviceName = $message["serviceName"];
+                    $username = $message["username"];
+                    $address = $message["address"];
+                    $timestamp = $message["timestamp"];
+                    (new PlayerVoteEvent($username, $serviceName, $address, $timestamp))->call();
+                    $this->getLogger()->debug("Got vote from votifier server: $username, $serviceName, $address, $timestamp");
+                }
+            }
+        });
+        $this->notifierId = $sleeperHandlerEntry->getNotifierId();
 
-		$this->thread = new VoteThread(
-			$this->getConfig()->get("address"),
-			$this->getConfig()->get("port"),
-			$this->getConfig()->get("password"),
-			$this->notifier,
-			$in,
-			$out
-		);
-		$this->thread->start();
+        $this->thread = new VoteThread(
+            $this->getConfig()->get("address"),
+            $this->getConfig()->get("port"),
+            $this->getConfig()->get("password"),
+            $sleeperHandlerEntry,
+            $in,
+            $out
+        );
+        $this->thread->start();
+    }
 
-		$this->getServer()->getTickSleeper()->addNotifier($this->notifier, function() use ($out) : void{
-			if(($data = $out->shift()) !== null){
-				$opData = json_decode(igbinary_unserialize($data), true);
-				if($opData["op"] === VoteThread::LOGIN_SUCCESS){
-					$this->thread->setAuthenticated(true);
-					$this->getLogger()->info("Authenticated to Votifier server");
-				}elseif($opData["op"] === VoteThread::LOGIN_FAILURE){
-					$this->getLogger()->error("Failed to authenticate to Votifier server");
-					$this->getServer()->getPluginManager()->disablePlugin($this);
-				}elseif($opData["op"] === VoteThread::MESSAGE){
-					$message = json_decode($opData["payload"], true);
-					$serviceName = $message["serviceName"];
-					$username = $message["username"];
-					$address = $message["address"];
-					$timestamp = $message["timestamp"];
-					(new PlayerVoteEvent($username, $serviceName, $address, $timestamp))->call();
-					$this->getLogger()->debug("Got vote from votifier server: $username, $serviceName, $address, $timestamp");
-				}
-			}
-		});
-	}
-
-	protected function onDisable() : void{
-		if(isset($this->thread)){
-			$this->thread->shutdown();
-		}
-		if(isset($this->notifier)){
-			$this->getServer()->getTickSleeper()->removeNotifier($this->notifier);
-		}
-	}
+    protected function onDisable() : void{
+        if(isset($this->thread)){
+            $this->thread->shutdown();
+        }
+        if($this->notifierId != -1){
+            $this->getServer()->getTickSleeper()->removeNotifier($this->notifierId);
+        }
+    }
 }
