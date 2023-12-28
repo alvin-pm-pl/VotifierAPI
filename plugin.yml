@@ -1,7 +1,7 @@
 name: VotifierAPI
 author: alvin0319
 main: alvin0319\VotifierAPI\Loader
-version: 2.0.0
+version: 2.0.1
 api: 5.0.0
 
 src-namespace-prefix: alvin0319\VotifierAPI

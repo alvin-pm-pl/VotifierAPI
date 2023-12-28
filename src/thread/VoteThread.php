@@ -76,6 +76,8 @@ final class VoteThread extends Thread{
 			throw new \RuntimeException("Failed to send auth data");
 		}
 
+        $notifier = $this->notifier->createNotifier();
+
 		while(!$this->shutdown){
 			$start = microtime(true);
 			$res = fread($socket, 1024);
@@ -88,7 +90,7 @@ final class VoteThread extends Thread{
 			}
 			if(trim($res) !== ""){
 				$this->out[] = igbinary_serialize($res);
-				$this->notifier->createNotifier()->wakeupSleeper();
+				$notifier->wakeupSleeper();
 			}
 			while(($data = $this->in->shift()) !== null){
 				$opCode = json_encode([
