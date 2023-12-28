@@ -48,7 +48,7 @@ final class VoteThread extends Thread{
 		private string $hostAddress,
 		private int $hostPort,
 		private string $password,
-		private SleeperHandlerEntry $notifier,
+		private SleeperHandlerEntry $sleeperHandlerEntry,
 		private ThreadSafeArray $in,
 		private ThreadSafeArray $out
 	){
@@ -76,7 +76,7 @@ final class VoteThread extends Thread{
 			throw new \RuntimeException("Failed to send auth data");
 		}
 
-        $notifier = $this->notifier->createNotifier();
+        $notifier = $this->sleeperHandlerEntry->createNotifier();
 
 		while(!$this->shutdown){
 			$start = microtime(true);
